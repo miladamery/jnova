@@ -1,6 +1,6 @@
 package ir.nova
 
-object Consts {
+object Const {
     const val USER_TABLE = "user"
     const val APPLICATION_KEYSPACE = "akka"
 }

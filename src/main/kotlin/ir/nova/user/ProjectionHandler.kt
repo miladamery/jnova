@@ -2,7 +2,6 @@ package ir.nova.user
 
 import akka.Done
 import akka.actor.typed.ActorSystem
-import akka.cluster.sharding.typed.javadsl.EntityTypeKey
 import akka.persistence.cassandra.query.javadsl.CassandraReadJournal
 import akka.persistence.query.Offset
 import akka.projection.ProjectionId
@@ -13,7 +12,7 @@ import akka.projection.javadsl.AtLeastOnceProjection
 import akka.projection.javadsl.Handler
 import akka.stream.alpakka.cassandra.javadsl.CassandraSession
 import akka.stream.alpakka.cassandra.javadsl.CassandraSessionRegistry
-import ir.nova.Consts
+import ir.nova.Const
 import java.time.Duration
 import java.util.concurrent.CompletionStage
 
@@ -49,7 +48,7 @@ class ProjectionHandlerImpl(private val session: CassandraSession) : ProjectionH
     override fun updateUser(event: Events): CompletionStage<Done> {
         when (event) {
             is UserRegistered -> {
-                val cql = "UPDATE ${Consts.APPLICATION_KEYSPACE}.${Consts.USER_TABLE} SET firstName = ?, lastName = ?, email = ? WHERE username = ?"
+                val cql = "UPDATE ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE} SET firstName = ?, lastName = ?, email = ? WHERE username = ?"
                 return session.executeWrite(
                     cql,
                     event.firstName,
@@ -59,7 +58,7 @@ class ProjectionHandlerImpl(private val session: CassandraSession) : ProjectionH
                 )
             }
             is UserUpdated -> {
-                val cql = "UPDATE ${Consts.APPLICATION_KEYSPACE}.${Consts.USER_TABLE} SET firstName = ?, lastName = ?, email = ? WHERE username = ?"
+                val cql = "UPDATE ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE} SET firstName = ?, lastName = ?, email = ? WHERE username = ?"
                 return session.executeWrite(
                     cql,
                     event.firstName,

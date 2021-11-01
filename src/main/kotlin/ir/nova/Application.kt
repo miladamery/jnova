@@ -1,17 +1,45 @@
 package ir.nova
 
 import akka.actor.typed.ActorSystem
+import akka.cluster.sharding.typed.javadsl.ClusterSharding
 import akka.http.javadsl.Http
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import ir.nova.user.UserRoutes
+import jakarta.validation.Validation
+import jakarta.validation.Validator
+import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.Configuration
+
+@Configuration
+@ComponentScan("ir.nova")
+open class Application {
+
+    @Bean
+    open fun actorSystem(): ActorSystem<Void> =
+        ActorSystem.create(GuardianActor.create(), "ClusterSystem")
+
+    @Bean
+    open fun httpServer(actorSystem: ActorSystem<Void>, userRoutes: UserRoutes): Http =
+        Http
+            .get(actorSystem)
+            .apply {
+                newServerAt("localhost", 8086)
+                    .bind(userRoutes.routes())
+            }
+
+    @Bean
+    open fun beanValidator(): Validator = Validation.buildDefaultValidatorFactory().validator
+
+    @Bean
+    open fun objectMapper(): ObjectMapper = jacksonObjectMapper()
+
+    @Bean
+    open fun clusterSharding(actorSystem: ActorSystem<Void>): ClusterSharding = ClusterSharding.get(actorSystem)
+}
 
 fun main() {
-    val system = ActorSystem.create(GuardianActor.create(), "ClusterSystem")
-    Cassandra.system = system
-
-    Http
-        .get(system)
-        .apply {
-            newServerAt("localhost", 8086)
-                .bind(UserRoutes(system).routes())
-        }
+    AnnotationConfigApplicationContext(Application::class.java)
 }

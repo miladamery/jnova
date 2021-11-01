@@ -13,24 +13,26 @@ import akka.http.javadsl.server.Route
 import akka.pattern.StatusReply
 import akka.stream.alpakka.cassandra.javadsl.CassandraSource
 import akka.stream.javadsl.Sink
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import ir.nova.Cassandra
-import ir.nova.Consts
+import ir.nova.Const
 import jakarta.validation.Path
-import jakarta.validation.Validation
 import jakarta.validation.Validator
-import jakarta.validation.ValidatorFactory
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
-class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
-    private val factory: ValidatorFactory = Validation.buildDefaultValidatorFactory()
-    private val validator: Validator = factory.validator
-    private val objectMapper = jacksonObjectMapper()
-    private val sharding = ClusterSharding.get(system)
+@Component
+class UserRoutes(
+    private val system: ActorSystem<*>,
+    private val cassandra: Cassandra,
+    private val validator: Validator,
+    private val objectMapper: ObjectMapper,
+    private val sharding: ClusterSharding
+) : AllDirectives() {
     private val askDuration = Duration.ofMinutes(2)
 
     data class RegisterRequest(
@@ -67,7 +69,8 @@ class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
             pathEndOrSingleSlash {
                 concat(registerUserRoute(), updateUserRoute())
             },
-            loadUserRoute()
+            loadUserRoute(),
+            loadAllUsers()
         )
     }
 
@@ -95,8 +98,16 @@ class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
         }
     }
 
+    private fun loadAllUsers(): Route = get {
+        pathPrefix("all") {
+            onSuccess(loadAllUsersRequestHandler()) { response ->
+                complete(response)
+            }
+        }
+    }
+
     private fun registerRequestHandler(registerRequest: RegisterRequest): CompletionStage<HttpResponse?> =
-        userRequestHandlerBuilder<UserRegistered>(
+        userAggregateAskRequestHandlerBuilder<UserRegistered>(
             registerRequest,
             registerRequest.username,
             { userRegistered -> createdResponse(userRegistered) },
@@ -110,45 +121,22 @@ class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
                 ref
             )
         }
-    /*{
-        val errors = validate(registerRequest)
-        return if (errors != null) {
-            CompletableFuture
-                .completedFuture(badRequestResponse(errors))
-        } else {
-            sharding
-                .entityRefFor(UserAggregate.ENTITY_TYPE_KEY, registerRequest.username)
-                .askWithStatus<UserRegistered>(
-                    { ref ->
-                        Register(
-                            registerRequest.firstName,
-                            registerRequest.lastName,
-                            ir.nova.user.Email(registerRequest.email),
-                            Username(registerRequest.username),
-                            ref
-                        )
-                    },
-                    askDuration
-                )
-                .thenApply { userRegistered -> createdResponse(userRegistered) }
-                .exceptionally { exception -> badRequestResponse(exception.message.toString()) }
-        }
-    }*/
 
-    private fun rRH(registerRequest: RegisterRequest) = userRequestHandlerBuilder<UserRegistered>(
-        registerRequest,
-        registerRequest.username,
-        { userRegistered -> createdResponse(userRegistered) },
-        { exception -> badRequestResponse(exception.message.toString()) }
-    ) { ref ->
-        Register(
-            registerRequest.firstName,
-            registerRequest.lastName,
-            ir.nova.user.Email(registerRequest.email),
-            Username(registerRequest.username),
-            ref
-        )
-    }
+    private fun updateRequestHandler(updateRequest: UpdateRequest): CompletionStage<HttpResponse?> =
+        userAggregateAskRequestHandlerBuilder<UserUpdated>(
+            updateRequest,
+            updateRequest.username,
+            { okResponse(it) },
+            { notFoundResponse() }
+        ) { ref ->
+            Update(
+                updateRequest.firstName,
+                updateRequest.lastName,
+                ir.nova.user.Email(updateRequest.email),
+                Username(updateRequest.username),
+                ref
+            )
+        }
 
     private fun loadRequestHandler(loadRequest: LoadRequest): CompletionStage<HttpResponse?> {
         val errors = validate(loadRequest)
@@ -157,8 +145,8 @@ class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
         } else {
             CassandraSource
                 .create(
-                    Cassandra.session,
-                    "SELECT * FROM ${Consts.APPLICATION_KEYSPACE}.${Consts.USER_TABLE} WHERE username = ?",
+                    cassandra.session,
+                    "SELECT * FROM ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE} WHERE username = ?",
                     loadRequest.username
                 )
                 .limit(1)
@@ -176,49 +164,30 @@ class UserRoutes(private val system: ActorSystem<*>) : AllDirectives() {
         }
     }
 
-    private fun updateRequestHandler(updateRequest: UpdateRequest): CompletionStage<HttpResponse?> =
-        userRequestHandlerBuilder<UserUpdated>(
-            updateRequest,
-            updateRequest.username,
-            { okResponse(it) },
-            { notFoundResponse() }
-        ) { ref ->
-            Update(
-                updateRequest.firstName,
-                updateRequest.lastName,
-                ir.nova.user.Email(updateRequest.email),
-                Username(updateRequest.username),
-                ref
+    private fun loadAllUsersRequestHandler(): CompletionStage<HttpResponse> =
+        CassandraSource
+            .create(
+                cassandra.session,
+                "SELECT * FROM ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE}"
             )
-        }
-    /*{
-        val errors = validate(updateRequest)
-        return if (errors != null) {
-            CompletableFuture
-                .completedFuture(badRequestResponse(errors))
-        } else {
-            sharding
-                .entityRefFor(UserAggregate.ENTITY_TYPE_KEY, updateRequest.username)
-                .askWithStatus<UserUpdated>(
-                    { ref ->
-                        Update(
-                            updateRequest.firstName,
-                            updateRequest.lastName,
-                            ir.nova.user.Email(updateRequest.email),
-                            Username(updateRequest.username),
-                            ref
-                        )
-                    },
-                    askDuration
+            .map { row ->
+                UserEntity(
+                    row.getString("firstname")!!,
+                    row.getString("lastname")!!,
+                    ir.nova.user.Email(row.getString("email")!!),
+                    Username(row.getString("username")!!)
                 )
-                .thenApply { userUpdated ->
-                    okResponse(userUpdated)
-                }
-                .exceptionally { notFoundResponse() }
-        }
-    }*/
+            }
+            .runFold(
+                mutableListOf<UserEntity>(),
+                { list, entity ->
+                    list.add(entity)
+                    list
+                }, system
+            )
+            .thenApply { users -> okResponse(users) }
 
-    private inline fun <reified T> userRequestHandlerBuilder(
+    private inline fun <reified T> userAggregateAskRequestHandlerBuilder(
         request: Any,
         entityId: String,
         noinline successResponse: (T) -> HttpResponse,

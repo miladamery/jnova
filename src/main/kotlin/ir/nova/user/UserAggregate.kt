@@ -45,7 +45,6 @@ class UserAggregate private constructor(persistenceId: PersistenceId, private va
             .onCommand(Update::class.java) { _, command ->
                 val errorMsg = JnovaProperties
                     .getProperty("ir.nova.user.UserAggregate.userDoesNotExistError")
-                    .replace("{0}", command.username.value)
                 Effect().none()
                     .thenReply(command.replyTo) { StatusReply.error(errorMsg) }
             }
@@ -59,7 +58,6 @@ class UserAggregate private constructor(persistenceId: PersistenceId, private va
                 Effect().none().thenReply(command.replyTo) {
                     val errMSg = JnovaProperties
                         .getProperty("ir.nova.user.UserAggregate.register.duplicate.error")
-                        .replace("{0}", command.username.value)
                     StatusReply.error(errMSg)
                 }
             }

@@ -7,13 +7,13 @@ import java.util.*
 
 object JnovaProperties {
 
-    private val properties: Properties;
+    private val properties: Properties = Properties()
 
     init {
-        val rootPath = Thread.currentThread().contextClassLoader.getResource("").path
-        val appConfigPath = rootPath + "jnova.properties"
-        properties = Properties()
-        properties.load(InputStreamReader(FileInputStream(appConfigPath), "UTF-8"))
+        val classLoader = this.javaClass.classLoader
+        classLoader.getResourceAsStream("jnova.properties").use {
+            properties.load(InputStreamReader(it, "UTF-8"))
+        }
     }
 
     fun getProperty(key: String): String = properties.getProperty(key)

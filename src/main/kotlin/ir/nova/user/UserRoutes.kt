@@ -14,12 +14,13 @@ import akka.pattern.StatusReply
 import akka.stream.alpakka.cassandra.javadsl.CassandraSource
 import akka.stream.javadsl.Sink
 import com.fasterxml.jackson.databind.ObjectMapper
-import ir.nova.Cassandra
-import ir.nova.Const
+import ir.nova.config.Cassandra
+import ir.nova.config.Const
 import jakarta.validation.Path
 import jakarta.validation.Validator
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
@@ -44,7 +45,10 @@ class UserRoutes(
         @get:NotBlank(message = "{ir.nova.user.UserRoutes.RegisterRequest.email.NotBlank}")
         val email: String,
         @get:NotBlank(message = "{ir.nova.user.UserRoutes.RegisterRequest.username.NotBlank}")
-        val username: String
+        val username: String,
+        @get:NotBlank(message = "{ir.nova.user.UserRoutes.RegisterRequest.password.NotBlank}")
+        @get:Size(min = 8, message = "{ir.nova.user.UserRoutes.RegisterRequest.password.min.Size}")
+        val password: String
     )
 
     data class LoadRequest(
@@ -118,6 +122,7 @@ class UserRoutes(
                 registerRequest.lastName,
                 ir.nova.user.Email(registerRequest.email),
                 Username(registerRequest.username),
+                Password(registerRequest.password),
                 ref
             )
         }
@@ -151,7 +156,7 @@ class UserRoutes(
                 )
                 .limit(1)
                 .map { row ->
-                    UserEntity(
+                    UserDto(
                         row.getString("firstname")!!,
                         row.getString("lastname")!!,
                         ir.nova.user.Email(row.getString("email")!!),
@@ -171,7 +176,7 @@ class UserRoutes(
                 "SELECT * FROM ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE}"
             )
             .map { row ->
-                UserEntity(
+                UserDto(
                     row.getString("firstname")!!,
                     row.getString("lastname")!!,
                     ir.nova.user.Email(row.getString("email")!!),
@@ -179,7 +184,7 @@ class UserRoutes(
                 )
             }
             .runFold(
-                mutableListOf<UserEntity>(),
+                mutableListOf<UserDto>(),
                 { list, entity ->
                     list.add(entity)
                     list

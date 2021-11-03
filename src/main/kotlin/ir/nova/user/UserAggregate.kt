@@ -10,7 +10,8 @@ import akka.persistence.typed.javadsl.CommandHandler
 import akka.persistence.typed.javadsl.EventHandler
 import akka.persistence.typed.javadsl.EventSourcedBehavior
 import akka.persistence.typed.javadsl.RetentionCriteria
-import ir.nova.JnovaProperties
+import ir.nova.config.JnovaProperties
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
 class UserAggregate private constructor(persistenceId: PersistenceId, private val ctx: ActorContext<UserCommands>) :
     EventSourcedBehavior<UserCommands, Events, UserEntity>(persistenceId) {
@@ -33,7 +34,10 @@ class UserAggregate private constructor(persistenceId: PersistenceId, private va
             .forNullState()
             .onCommand(Register::class.java) { _, command ->
                 command
-                    .run { UserRegistered(firstName, lastName, email, username) }
+                    .run {
+                        val encryptedPassword = Password(BCryptPasswordEncoder().encode(command.password.value))
+                        UserRegistered(firstName, lastName, email, username, encryptedPassword)
+                    }
                     .let { event ->
                         Effect()
                             .persist(event)
@@ -82,7 +86,7 @@ class UserAggregate private constructor(persistenceId: PersistenceId, private va
         eventBuilder
             .forNullState()
             .onEvent(UserRegistered::class.java) { _, event ->
-                event.run { UserEntity(firstName, lastName, email, username) }
+                event.run { UserEntity(firstName, lastName, email, username, password) }
             }
             .onAnyEvent { state, event ->
                 ctx.log.warn("Received $event but won't process it in state: $state")
@@ -91,7 +95,7 @@ class UserAggregate private constructor(persistenceId: PersistenceId, private va
         eventBuilder
             .forNonNullState()
             .onEvent(UserUpdated::class.java) { state, event ->
-                event.run { UserEntity(event.firstName, event.lastName, event.email, state.username) }
+                event.run { UserEntity(event.firstName, event.lastName, event.email, state.username, state.password) }
             }
             .onAnyEvent { state, event ->
                 ctx.log.warn("Received $event but won't process it in state: $state")

@@ -1,6 +1,5 @@
-package ir.nova
+package ir.nova.config
 
-import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.util.*
 

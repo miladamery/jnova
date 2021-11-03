@@ -12,7 +12,7 @@ import akka.projection.javadsl.AtLeastOnceProjection
 import akka.projection.javadsl.Handler
 import akka.stream.alpakka.cassandra.javadsl.CassandraSession
 import akka.stream.alpakka.cassandra.javadsl.CassandraSessionRegistry
-import ir.nova.Const
+import ir.nova.config.Const
 import java.time.Duration
 import java.util.concurrent.CompletionStage
 
@@ -48,12 +48,13 @@ class ProjectionHandlerImpl(private val session: CassandraSession) : ProjectionH
     override fun updateUser(event: Events): CompletionStage<Done> {
         when (event) {
             is UserRegistered -> {
-                val cql = "UPDATE ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE} SET firstName = ?, lastName = ?, email = ? WHERE username = ?"
+                val cql = "UPDATE ${Const.APPLICATION_KEYSPACE}.${Const.USER_TABLE} SET firstName = ?, lastName = ?, email = ?, password = ? WHERE username = ?"
                 return session.executeWrite(
                     cql,
                     event.firstName,
                     event.lastName,
                     event.email.value,
+                    event.password.value,
                     event.username.value
                 )
             }

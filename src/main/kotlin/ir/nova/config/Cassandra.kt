@@ -1,4 +1,4 @@
-package ir.nova
+package ir.nova.config
 
 import akka.actor.typed.ActorSystem
 import akka.stream.alpakka.cassandra.CassandraSessionSettings

@@ -11,6 +11,7 @@ data class Register(
     val lastName: String,
     val email: Email,
     val username: Username,
+    val password: Password,
     val replyTo: ActorRef<StatusReply<UserRegistered>>
 ) : UserCommands
 

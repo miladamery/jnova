@@ -1,4 +1,4 @@
-package ir.nova
+package ir.nova.config
 
 object Const {
     const val USER_TABLE = "user"

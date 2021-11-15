@@ -1,5 +1,5 @@
 .idea/
 target/
 *.iml
-src/main/webapp/node_modules/
-src/main/webapp/package-lock.json
+src/main/resources/webapp/node_modules/
+src/main/resources/webapp/package-lock.json

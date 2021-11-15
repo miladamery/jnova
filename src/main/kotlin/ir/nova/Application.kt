@@ -3,6 +3,8 @@ package ir.nova
 import akka.actor.typed.ActorSystem
 import akka.cluster.sharding.typed.javadsl.ClusterSharding
 import akka.http.javadsl.Http
+import akka.http.javadsl.server.AllDirectives
+import akka.http.javadsl.server.Route
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import ir.nova.user.UserRoutes
@@ -15,7 +17,15 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 @ComponentScan("ir.nova")
-open class Application {
+open class Application : AllDirectives() {
+
+    @Bean
+    open fun applicationRoutes(userRoutes: UserRoutes): Route =
+        concat(
+            userRoutes.routes(),
+            getFromResourceDirectory("webapp/register")
+        )
+
 
     @Bean
     open fun actorSystem(): ActorSystem<Void> =
@@ -27,7 +37,7 @@ open class Application {
             .get(actorSystem)
             .apply {
                 newServerAt("localhost", 8086)
-                    .bind(userRoutes.routes())
+                    .bind(applicationRoutes(userRoutes))
             }
 
     @Bean

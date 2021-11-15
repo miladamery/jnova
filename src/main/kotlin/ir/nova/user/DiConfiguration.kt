@@ -7,6 +7,6 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 open class DiConfiguration {
 
-    @Bean
-    open fun userConverter(): UserConverter = Mappers.getMapper(UserConverter::class.java)
+    /*@Bean
+    open fun userConverter(): UserConverter = Mappers.getMapper(UserConverter::class.java)*/
 }

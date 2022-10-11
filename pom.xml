@@ -18,7 +18,7 @@
         <scala.binary.version>2.13</scala.binary.version>
         <akka.version>2.6.17</akka.version>
         <slick.version>3.3.3</slick.version>
-        <org.mapstruct.version>1.4.2.Final</org.mapstruct.version>
+        <org.mapstruct.version>1.5.2.Final</org.mapstruct.version>
     </properties>
 
     <repositories>
